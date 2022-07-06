@@ -1,22 +1,32 @@
 name: DEPLOYMENT 
 
 on:
-  pull_request:
-    branches: ['main']
+  pull_request_review:
+    types: [submitted]
+    branches: [main]
 
 
 jobs:
   build:
     runs-on: [self-hosted, windows, x64]
+    container:
+      image: node:mcr.microsoft.com/powershell:latest
 
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+
+      - name: payload
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: |
+          echo "$GITHUB_CONTEXT"
 
       - name: create delta-package
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          $pathsString = git diff origin/main origin/${{ github.head_ref }} --name-only force-app
+          $pathsString = git diff origin/HEAD origin/${{ env.HEAD_REF }}~0 --name-only force-app
           Write-Host $pathsString
           $pathArray = $pathsString.Split()
 
@@ -41,4 +51,4 @@ jobs:
       - name: deployment
         run: |
           sfdx force:source:deploy --sourcepath delta-package -u MyOrg
-       
+
